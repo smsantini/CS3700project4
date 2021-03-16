@@ -50,57 +50,40 @@ sock.settimeout(TIMEOUT)
 def log(string):
   sys.stderr.write(datetime.datetime.now().strftime("%H:%M:%S.%f") + " " + string + "\n")
 
-def send_next_packet():
-  global SEQUENCE
-  data = sys.stdin.read()
-  dataSize = len(data)
-#  print("data is: ")
-#  print(data)
-#  print("dataSize is: ")
-#  print(dataSize)
-  if dataSize <= DATA_SIZE:
-#    print("dataSize is smaller than DATA_SIZE")
-    if (dataSize > 0):
-#      print("dataSize is greater than 0")
-      msg = json.dumps({"sequence": SEQUENCE, "data": data, "ack": False, "eof": True})
-      SEQUENCE += len(data) 
-      if sock.sendto(msg, dest) < len(msg):
-        log("[error] unable to fully send packet")
-      else:
-        log("[send data] " + str(SEQUENCE) + " (" + str(len(data)) + ")")
-        return True
-    else:
-      return False
+def send_next_packet(msg):
+  if sock.sendto(msg, dest) < len(msg):
+    log("[error] unable to fully send packet")
+    return False
   else:
-    curSize = 0
-#    print("dataSize is greater than DATA_SIZE")
-    while curSize < dataSize:
-#      print("curSize is: ")
-#      print(curSize)
-      msg = {}
-      if dataSize - curSize >= DATA_SIZE:
-        Data = data[curSize: curSize+DATA_SIZE + 1]
-        msg = json.dumps({"sequence": SEQUENCE, "data": Data, "ack": False, "eof": False})
-        curSize += DATA_SIZE
-        SEQUENCE += DATA_SIZE
-      else:
-        Data = data[curSize: (dataSize-curSize)]
-        msg = json.dumps({"sequence": SEQUENCE, "data": Data, "ack": False, "eof": True})
-        curSize += (dataSize - curSize)
-        SEQUENCE += (dataSize - curSize)
-#      print("MSG is ")
-#      print(msg)
-#      print(SEQUENCE)
-      if sock.sendto(msg, dest) < len(msg):
-        log("[error] unable to fully send packet")
-      else:
-        log("[send data] " + str(SEQUENCE) + " (" + str(len(data)) + ")")
-        # return True
-     # return True 
-       
-
-# Send first packet
-send_next_packet()
+    log("[send data] " + str(SEQUENCE) + " (" + str(len(data)) + ")")
+    return True
+     
+# PROPOSED CHANGE: read in input, separate into appropriately sized messages, call send_next_packet(message) for each message
+global SEQUENCE    
+data = sys.stdin.read()
+dataSize = len(data)
+if dataSize <= DATA_SIZE:
+  if (dataSize > 0):
+    msg = json.dumps({"sequence": SEQUENCE, "data": data, "ack": False, "eof": True})
+    SEQUENCE += len(data) 
+    send_next_packet(msg)   
+  else:
+    return False
+else:
+  curSize = 0
+  while curSize < dataSize:
+    msg = {}
+    if dataSize - curSize >= DATA_SIZE:
+      Data = data[curSize: curSize+DATA_SIZE + 1]
+      msg = json.dumps({"sequence": SEQUENCE, "data": Data, "ack": False, "eof": False})
+      curSize += DATA_SIZE
+      SEQUENCE += DATA_SIZE
+    else:
+      Data = data[curSize: (dataSize-curSize)]
+      msg = json.dumps({"sequence": SEQUENCE, "data": Data, "ack": False, "eof": True})
+      curSize += (dataSize - curSize)
+      SEQUENCE += (dataSize - curSize)
+  send_next_packet(msg)
 
 # Now read in data, send packets
 while True:
