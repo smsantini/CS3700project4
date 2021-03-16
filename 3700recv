@@ -15,9 +15,10 @@ import json
 def log(string):
   sys.stderr.write(datetime.datetime.now().strftime("%H:%M:%S.%f") + " " + string + "\n")
 
-MSG_SIZE = 300
+MSG_SIZE = 1000
 TIMEOUT = 30
 WINDOW_SIZE = 1
+SEQUENCE_FROM_SENDER = []
 
 # Bind to localhost and an ephemeral port
 UDP_IP = "127.0.0.1"
@@ -47,25 +48,34 @@ while True:
 #    print(data)
     try:
       decoded = json.loads(data)
-
-      # If the EOF flag is set, exit
-      if (decoded['eof']):
-        sys.stdout.write(RESULT_STRING)
-        log("[completed]")
-        sys.exit(0)
-
       # If there is data, we accept it and print it out
       if (decoded['data']):
         # If we receive data, we assume it's in-order
         # You will need to do much more here
-        log("[recv data] " + str(decoded['sequence']) + " (" + str(len(decoded['data'])) + ") ACCEPTED (in-order)")
         #sys.stdout.write(decoded['data'])
-        RESULT_STRING += decoded['data']
-      # Send back an ack to the sender
-      msg = json.dumps({"ack": decoded['sequence'] + len(decoded['data'])})
-      log("ABOUT TO SEND " + msg)
-      if sock.sendto(msg, addr) < len(msg):
-        log("[error] unable to fully send packet")
+        CUR_SEQUENCE = 0 if len(SEQUENCE_FROM_SENDER) == 0 else SEQUENCE_FROM_SENDER[len(SEQUENCE_FROM_SENDER - 1)]
+        if CUR_SEQUENCE + len(decoded['data']) == decoded['sequence']:
+          log("[recv data] " + str(decoded['sequence']) + " (" + str(len(decoded['data'])) + ") ACCEPTED (in-order)")
+          RESULT_STRING += decoded['data']
+          msg = json.dumps({"ack": decoded['sequence'] + len(decoded['data'])})
+          sock.sendto(msg, addr)
+          CUR_SEQUENCE += len(decoded['data'])
+        else: 
+          log("[recv data] " + str(decoded['sequence']) + " (" + str(len(decoded['data'])) + ") REJECTED (in-order)")
+          # Send back an ack to the sender
+          # msg = json.dumps({"ack": decoded['sequence'] + len(decoded['data'])})
+          msg = json.dumps({"ack": "received the wrong packet, sequence number does not match", "seq": CUR_SEQUENCE})
+          log("ABOUT TO SEND " + msg)
+        if sock.sendto(msg, addr) < len(msg):
+          log("[error] unable to fully send packet")
+
+      if (decoded['eof']):
+        sys.stdout.write(RESULT_STRING)
+        log("[completed]")
+        msg = json.dumps({"ack": "receiver program ended"})
+        log("receiver exit message constructed")
+        sock.sendto(msg, addr)
+        sys.exit(0)
 
     except (ValueError, KeyError, TypeError) as e:
       log("[recv corrupt packet]")
