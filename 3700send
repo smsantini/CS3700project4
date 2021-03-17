@@ -36,6 +36,9 @@ DATA_SIZE = 1000
 TIMEOUT = 30
 SEQUENCE = 0
 PACKETS_MEMORY = []
+ADV_WINDOW = 1
+WINDOW = 1
+CURRENT_WINDOW = WINDOW
 
 # Bind to localhost and an ephemeral port
 IP_PORT = sys.argv[1]
@@ -74,6 +77,7 @@ def send_next_packet():
       else:
         PACKETS_MEMORY.append(msg)
         log("[send data] " + str(SEQUENCE) + " (" + str(len(data)) + ")")
+        CURRENT_WINDOW -= 1
         return True
     else:
       return False
@@ -98,6 +102,7 @@ def send_next_packet():
         log("[error] unable to fully send packet")
       else:
         log("[send data] " + str(SEQUENCE) + " (" + str(len(data)) + ")")
+        CURRENT_WINDOW -= 1
         PACKETS_MEMORY.append(msg)
         # return True
      # return True 
@@ -110,6 +115,11 @@ while True:
   log("ABOUT TO SLEEP")
   result = sock.recvfrom(MSG_SIZE)
   
+  while (CURRENT_WINDOW > 0):
+    if (not send_next_packet()):
+      break
+  CURRENT_WINDOW = WINDOW
+  
   if result:
     (data, addr) = result
     try:
@@ -119,6 +129,7 @@ while True:
         sys.exit(0)
       if decoded["ack"] == "received the wrong packet, sequence number does not match":
         log("receiver receive wrong packet, try to detect which one and resend")
+        WINDOW /= 2
         # obtain the current sequence number and compare
         SEQ_COUNT = 0
         # determine packet to send
@@ -128,11 +139,20 @@ while True:
                log("[error] unable to fully send packet")
              else:
                log("[send data] " + str(SEQUENCE) + " (" + str(len(data)) + ")")
+                CURRENT_WINDOW -= 1
           else:
             SEQ_COUNT += len(packet['data'])
       # If there is an ack, send next packet
       if decoded['ack'] == SEQUENCE:
         log("[recv ack] " + str(SEQUENCE))
+        ADV_WINDOW = decoded['window']
+        if WINDOW < ADV_WINDOW:
+          if WINDOW == 0:
+            WINDOW = 2
+          else:
+            WINDOW *= 2
+        else:
+          WINDOW += 1
         # Try to send next packet; break if no more data
         if (not send_next_packet()):
           break
