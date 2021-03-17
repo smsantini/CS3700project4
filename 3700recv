@@ -50,14 +50,16 @@ while True:
         if CUR_SEQUENCE + len(decoded['data']) == decoded['sequence']:
           log("[recv data] " + str(decoded['sequence']) + " (" + str(len(decoded['data'])) + ") ACCEPTED (in-order)")
           RESULT_STRING += decoded['data']
-          msg = json.dumps({"ack": decoded['sequence'] + len(decoded['data'])})
+          WINDOW_SIZE += 1
+          msg = json.dumps({"ack": decoded['sequence'] + len(decoded['data']), "window": WINDOW_SIZE})
           sock.sendto(msg, addr)
           CUR_SEQUENCE += len(decoded['data'])
           SEQUENCE_FROM_SENDER.append(decoded['sequence'])
-        else:  
+        else:
           log("[recv data] " + str(decoded['sequence']) + " (" + str(len(decoded['data'])) + ") REJECTED (in-order)")
           # Send back an ack to the sender
           msg = json.dumps({"ack": "received the wrong packet, sequence number does not match", "seq": CUR_SEQUENCE})
+          WINDOW_SIZE -= 1
           log("ABOUT TO SEND " + msg)
         if sock.sendto(msg, addr) < len(msg):
           log("[error] unable to fully send packet")
