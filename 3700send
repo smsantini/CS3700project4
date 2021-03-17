@@ -71,7 +71,7 @@ def send_next_packet():
   if dataSize <= DATA_SIZE - offset: 
     if (dataSize > 0):
       SEQUENCE += dataSize
-      msg = json.dumps({"sequence": SEQUENCE, "data": data, "ack": False, "eof": True})
+      msg = json.dumps({"sequence": SEQUENCE, "data": data, "ack": False, "eof": True, "time": time.time()})
       if sock.sendto(msg, dest) < len(msg):
         log("[error] unable to fully send packet")
       else:
@@ -90,13 +90,13 @@ def send_next_packet():
         Data = data[curSize: dataSize]
         SEQUENCE += (dataSize - curSize)
         curSize = dataSize
-        msg = json.dumps({"sequence": SEQUENCE, "data": Data, "ack": False, "eof": True})
+        msg = json.dumps({"sequence": SEQUENCE, "data": Data, "ack": False, "eof": True, "time": time.time()})
       # otherwise:
       else:
         Data = data[curSize: curSize + (DATA_SIZE - offset)]
         curSize += (DATA_SIZE - offset)
         SEQUENCE += (DATA_SIZE - offset)
-        msg = {"sequence": SEQUENCE, "data": Data, "ack": False, "eof": False}
+        msg = {"sequence": SEQUENCE, "data": Data, "ack": False, "eof": False, "time": time.time()}
         msg = json.dumps(msg)
       if sock.sendto(msg, dest) < len(msg):
         log("[error] unable to fully send packet")
@@ -147,12 +147,13 @@ while True:
         log("[recv ack] " + str(SEQUENCE))
         ADV_WINDOW = decoded['window']
         if WINDOW < ADV_WINDOW:
-          if WINDOW == 0:
-            WINDOW = 2
-          else:
-            WINDOW *= 2
+          WINDOW *= 2
         else:
           WINDOW += 1
+        for packet in PACKETS_MEMORY:
+          if packet['sequence'] == decoded['ack']:
+            if (time.time() - packet['time']) > 0.005:
+              WINDOW -= 1
         # Try to send next packet; break if no more data
         if (not send_next_packet()):
           break
