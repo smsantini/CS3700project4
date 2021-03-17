@@ -1,5 +1,5 @@
 #!/usr/bin/python -u
-#
+# /usr/local/bin/testall to use testall
 # CS3700, Spring 2015
 # Project 2 Starter Code
 # handle delaying of packet to the receiver from sender
@@ -33,37 +33,30 @@ sock.settimeout(TIMEOUT)
 UDP_PORT = sock.getsockname()[1]
 log("[bound] " + str(UDP_PORT))
 
-
-
 RESULT_STRING = ""
 # Now listen for packets
 while True:
-#  print("result is: ")
   result = sock.recvfrom(MSG_SIZE)
-#  print(result)
   # If nothing is ready, we hit the timeout
   if result:
     (data, addr) = result
-#    print("data is: ")
-#    print(data)
     try:
       decoded = json.loads(data)
       # If there is data, we accept it and print it out
       if (decoded['data']):
         # If we receive data, we assume it's in-order
         # You will need to do much more here
-        #sys.stdout.write(decoded['data'])
-        CUR_SEQUENCE = 0 if len(SEQUENCE_FROM_SENDER) == 0 else SEQUENCE_FROM_SENDER[len(SEQUENCE_FROM_SENDER - 1)]
+        CUR_SEQUENCE = 0 if len(SEQUENCE_FROM_SENDER) == 0 else SEQUENCE_FROM_SENDER[len(SEQUENCE_FROM_SENDER) - 1]
         if CUR_SEQUENCE + len(decoded['data']) == decoded['sequence']:
           log("[recv data] " + str(decoded['sequence']) + " (" + str(len(decoded['data'])) + ") ACCEPTED (in-order)")
           RESULT_STRING += decoded['data']
           msg = json.dumps({"ack": decoded['sequence'] + len(decoded['data'])})
           sock.sendto(msg, addr)
           CUR_SEQUENCE += len(decoded['data'])
-        else: 
+          SEQUENCE_FROM_SENDER.append(decoded['sequence'])
+        else:  
           log("[recv data] " + str(decoded['sequence']) + " (" + str(len(decoded['data'])) + ") REJECTED (in-order)")
           # Send back an ack to the sender
-          # msg = json.dumps({"ack": decoded['sequence'] + len(decoded['data'])})
           msg = json.dumps({"ack": "received the wrong packet, sequence number does not match", "seq": CUR_SEQUENCE})
           log("ABOUT TO SEND " + msg)
         if sock.sendto(msg, addr) < len(msg):

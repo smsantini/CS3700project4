@@ -1,5 +1,4 @@
 #!/usr/bin/python -u
-#
 # CS3700, Spring 2015
 # Project 2 Starter Code
 
@@ -25,8 +24,6 @@
 # delay
 # reorder
 # duplicate
-
-
 import sys
 import socket
 import time
@@ -50,27 +47,27 @@ dest = (UDP_IP, UDP_PORT)
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) 
 sock.settimeout(TIMEOUT)
 
+
 def log(string):
   sys.stderr.write(datetime.datetime.now().strftime("%H:%M:%S.%f") + " " + string + "\n")
 
+# complete message is: ('{"ack": false, "data": "dkapwokdpaksdakw[pdk[wkf[apwkd[pawkdpakwdpa[wkf", "eof": true, "sequence": 47}', ('127.0.0.1', 36857))
 # change maximum data size
 # implementation for sliding window
 # getting RTT for delay (dropped packet (duplicated acks) as well as delayed packet as well) --> 
 # way to retransmitted and 
 # reordered packet: receiver reorder base on sequence number
+# offset = len('{"sequence": ' + dataSize + ', " data": , "ack": False, "eof": False}')
+
 def send_next_packet():
   global SEQUENCE
   data = sys.stdin.read()
   dataSize = len(data)
-#  print("data is: ")
-#  print(data)
-#  print("dataSize is: ")
-#  print(dataSize)
-  if dataSize <= DATA_SIZE:
-#    print("dataSize is smaller than DATA_SIZE")
+  offset = len(json.dumps({"sequence": dataSize, "data": data, "ack": False, "eof": False})) - dataSize
+  # calculate offset
+  if dataSize <= DATA_SIZE - offset: 
     if (dataSize > 0):
-#      print("dataSize is greater than 0")
-      SEQUENCE += len(data)
+      SEQUENCE += dataSize
       msg = json.dumps({"sequence": SEQUENCE, "data": data, "ack": False, "eof": True})
       if sock.sendto(msg, dest) < len(msg):
         log("[error] unable to fully send packet")
@@ -82,24 +79,21 @@ def send_next_packet():
       return False
   else:
     curSize = 0
-    print("dataSize is greater than DATA_SIZE")
     while curSize < dataSize:
-#      print("curSize is: ")
-#      print(curSize)
       msg = {}
-      if dataSize - curSize >= DATA_SIZE:
-        Data = data[curSize: curSize+DATA_SIZE + 1]
-        curSize += DATA_SIZE
-        SEQUENCE += DATA_SIZE
-        msg = json.dumps({"sequence": SEQUENCE, "data": Data, "ack": False, "eof": False})
-      else:
-        Data = data[curSize: (dataSize-curSize)]
-        curSize += (dataSize - curSize)
+      # if remaining data can be sent as one packet
+      if dataSize - curSize <= DATA_SIZE - offset:
+        Data = data[curSize: dataSize]
         SEQUENCE += (dataSize - curSize)
+        curSize = dataSize
         msg = json.dumps({"sequence": SEQUENCE, "data": Data, "ack": False, "eof": True})
-#      print("MSG is ")
-#      print(msg)
-#      print(SEQUENCE)
+      # otherwise:
+      else:
+        Data = data[curSize: curSize + (DATA_SIZE - offset)]
+        curSize += (DATA_SIZE - offset)
+        SEQUENCE += (DATA_SIZE - offset)
+        msg = {"sequence": SEQUENCE, "data": Data, "ack": False, "eof": False}
+        msg = json.dumps(msg)
       if sock.sendto(msg, dest) < len(msg):
         log("[error] unable to fully send packet")
       else:
@@ -108,7 +102,6 @@ def send_next_packet():
         # return True
      # return True 
        
-
 # Send first packet
 send_next_packet()
 
